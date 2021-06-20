@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH -J sort
+#SBATCH --account=rogersa-kp
+#SBATCH --partition=rogersa-kp
+#SBATCH --time=72:00:00
+#SBATCH --nodes 1
+#SBATCH --ntasks 2
+#SBATCH -o sort%a.out # stdout
+#SBATCH -e sort%a.err # stderr
+
+export LC_ALL=C
+
+i=${SLURM_ARRAY_TASK_ID}
+
+peeps=(`cut Frengland.txt -f1`);
+peep=${peeps["$i"]};
+unsorted="$peep".annotated.nh2.vcf.gz
+sorted=`echo "$unsorted" | cut -f1 -d'.'`_sorted.vcf.gz
+
+bcftools view -h $unsorted | bgzip > $sorted
+seq 22 | sort | xargs printf "%d\n" |
+xargs -n 1 -I CHR bcftools view  -H -r CHR $unsorted |
+bgzip >> $sorted
+
+tabix $sorted 
+

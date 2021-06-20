@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH -J join
+#SBATCH --account=rogersa-kp
+#SBATCH --partition=rogersa-kp
+#SBATCH --time=48:00:00
+#SBATCH --nodes 1
+#SBATCH --ntasks 2
+#SBATCH -o join.out # stdout
+#SBATCH -e join.err # stderr
+
+#(echo -n jpt' '; ls *raf*) | xargs bash join.slr
+
+date | xargs echo
+targets=( "$@" )
+outname=${targets[0]}
+echo $outname
+echo "${targets[@]}" | cut -f2- -d' '
+echo "${targets[@]}" | cut -f2- -d' '  | xargs joinraf | gzip  > $outname.raf.gz
+date | xargs echo
+

@@ -1,0 +1,64 @@
+#!/bin/bash
+#SBATCH -J yri
+#SBATCH --account=rogersa
+#SBATCH --partition=kingspeak
+#SBATCH --time=48:00:00
+#SBATCH --nodes 1
+#SBATCH --ntasks 2
+#SBATCH -o yri%a.out # stdout
+#SBATCH -e yri%a.err # stderr
+
+i=${SLURM_ARRAY_TASK_ID}
+
+# Set and make a temporary directory in the scratch
+SCRDIR=/scratch/general/lustre/$USER/$SLURM_JOB_ID
+mkdir -p $SCRDIR
+
+# get current directory
+loc=`pwd`
+
+# Outputting the date and time
+date | xargs echo
+
+# Copy the reference from its home to the scratch
+cp ~/harris/hg19-sort.fa $SCRDIR
+
+# Retrieve the names of the samples
+peeps=(`cut yri.txt -f1`)
+# The array ID for slurm is used to subset the samples to a single individual
+peep=${peeps["$i"]}
+ref=hg19-sort.fa
+
+# Copy the sample to the scratch
+target="$peep".sorted.vcf.gz
+cp $target $SCRDIR
+
+# Print name of the target file to out and err files so we don't have to keep track of which slurm ID corresponds to which sample
+echo "$target"
+>&2 echo "$target"
+
+# Switch to the scrath drive for speed
+cd $SCRDIR
+
+bcftools norm --multiallelics +any --fasta-ref $ref $target | #combine records of different types into a single line, then they will be removed by the filter command alone. Indels are normaliszed to the same positions using the refernence. 
+
+# Remove low quality and missing data. 
+bcftools filter -e 'FMT/FL = "0" | FMT/FL = "N"' | #Should be be doing this by including snps instead?
+
+# Limit the data to SNPs and fixed sites. 
+bcftools filter -i 'TYPE="snp" | TYPE="ref"' --SnpGap 7 |
+
+# Output the columns that are required by raf
+bcftools query -f '%CHROM\t%POS\t%REF \t%ALT\t[%GT]\n' | 
+
+# Make raf file
+raf | gzip > "$peep".raf.gz
+
+# Copy the resulting file to the original directory
+cp "$peep".raf.gz "$loc"/"$peep".raf.gz
+
+# print time again so we know how long this took. 
+date | xargs echo
+
+# Remove the temporary scratch directory. 
+rm -rf $SCRDIR
